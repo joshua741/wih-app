@@ -9,6 +9,9 @@
     "build": "tsc",
     "migrate": "ts-node src/db/migrate.ts"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
