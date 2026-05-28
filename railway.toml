@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npm run build && cd client && npm install && npm run build && cd .."
+buildCommand = "npm install --include=dev && npm run build && cd client && npm install --include=dev && npm run build && cd .."
 
 [deploy]
 startCommand = "npm run migrate && node dist/server.js"
