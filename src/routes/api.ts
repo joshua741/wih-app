@@ -120,7 +120,11 @@ apiRouter.post('/contacts/:id/messages', async (req: Request, res: Response) => 
 
   // Send via Twilio
   const twilio = await import('twilio');
-  const client = twilio.default(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
+  const client = twilio.default(
+    process.env.TWILIO_API_KEY!,
+    process.env.TWILIO_API_SECRET!,
+    { accountSid: process.env.TWILIO_ACCOUNT_SID! }
+  );
   const msg = await client.messages.create({
     to: toPhone,
     from: twilioNumber,
