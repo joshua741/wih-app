@@ -42,8 +42,9 @@ export async function fetchStages(): Promise<PipelineStage[]> {
   return res.data.stages
 }
 
-export async function moveStage(contactId: string, stageId: string): Promise<void> {
-  await api.patch('/pipeline/move', { contactId, stageId })
+export async function moveStage(contactId: string, stageId: string): Promise<Contact> {
+  const res = await api.patch('/pipeline/move', { contactId, stageId })
+  return res.data
 }
 
 export async function fetchDeals(params?: { stage_id?: string; assigned_to?: Agent }): Promise<Deal[]> {

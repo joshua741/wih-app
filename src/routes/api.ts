@@ -199,17 +199,38 @@ apiRouter.get('/pipeline/stages', async (_req: Request, res: Response) => {
   res.json({ stages: result.rows });
 });
 
-// PATCH /api/pipeline/move — move contact to a different stage
+// PATCH /api/pipeline/move — move contact to any stage (cross-pipeline supported)
 // Body: { contactId, stageId }
 apiRouter.patch('/pipeline/move', async (req: Request, res: Response) => {
   const { contactId, stageId } = req.body as { contactId: string; stageId: string };
+
+  const stageResult = await pool.query<{ pipeline: string; name: string; color: string }>(
+    'SELECT pipeline, name, color FROM pipeline_stages WHERE id = $1',
+    [stageId]
+  );
+  if (!stageResult.rows[0]) { res.status(404).json({ error: 'Stage not found' }); return; }
+  const { pipeline: newPipeline, name: stageName, color: stageColor } = stageResult.rows[0];
+
   const result = await pool.query(
-    'UPDATE contacts SET stage_id = $1 WHERE id = $2 RETURNING *',
-    [stageId, contactId]
+    'UPDATE contacts SET stage_id = $1, pipeline = $2 WHERE id = $3 RETURNING *',
+    [stageId, newPipeline, contactId]
   );
   if (!result.rows[0]) { res.status(404).json({ error: 'Not found' }); return; }
-  broadcast('contact:stage_changed', { contactId, stageId });
-  res.json(result.rows[0]);
+
+  // Update conversation twilio_number to match new pipeline
+  const twilioNumber = newPipeline === 'agent_outreach'
+    ? process.env.TWILIO_OUTREACH_NUMBER
+    : process.env.TWILIO_SELLER_NUMBER;
+  if (twilioNumber) {
+    await pool.query(
+      'UPDATE conversations SET twilio_number = $1 WHERE contact_id = $2',
+      [twilioNumber, contactId]
+    );
+  }
+
+  const updated = { ...result.rows[0], stage_name: stageName, stage_color: stageColor };
+  broadcast('contact:stage_changed', { contactId, stageId, pipeline: newPipeline });
+  res.json(updated);
 });
 
 // ─── STATS ───────────────────────────────────────────────────────────────────
