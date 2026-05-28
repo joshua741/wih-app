@@ -289,8 +289,9 @@ export async function handleInboundSMS(params: {
 
   // Send SMS via Twilio
   const twilioClient = twilio(
-    process.env.TWILIO_ACCOUNT_SID!,
-    process.env.TWILIO_AUTH_TOKEN!
+    process.env.TWILIO_API_KEY!,
+    process.env.TWILIO_API_SECRET!,
+    { accountSid: process.env.TWILIO_ACCOUNT_SID! }
   );
   const sentMsg = await twilioClient.messages.create({
     to: from,

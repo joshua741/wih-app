@@ -96,7 +96,11 @@ voiceRouter.post('/../../api/call/initiate', async (req: Request, res: Response)
 
 // Click-to-call handler (called directly from api.ts)
 export async function initiateClickToCall(contactPhone: string, agent: 'josh' | 'angel') {
-  const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+  const client = twilio(
+    process.env.TWILIO_API_KEY!,
+    process.env.TWILIO_API_SECRET!,
+    { accountSid: TWILIO_ACCOUNT_SID }
+  );
   const agentPhone = agent === 'josh' ? JOSH_PHONE : ANGEL_PHONE;
   const outboundNumber = process.env.TWILIO_SELLER_NUMBER!;
   const BASE_URL = process.env.BASE_URL || process.env.WEBHOOK_BASE_URL?.replace('/webhooks', '') || '';

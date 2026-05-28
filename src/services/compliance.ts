@@ -72,8 +72,9 @@ export async function handleOptOut(contactId: string): Promise<void> {
   // Send the ONE required final opt-out confirmation
   if (conv) {
     const client = twilio(
-      process.env.TWILIO_ACCOUNT_SID!,
-      process.env.TWILIO_AUTH_TOKEN!
+      process.env.TWILIO_API_KEY!,
+      process.env.TWILIO_API_SECRET!,
+      { accountSid: process.env.TWILIO_ACCOUNT_SID! }
     );
     try {
       const sent = await client.messages.create({
@@ -168,8 +169,9 @@ export async function handleHumanTakeover(contactId: string, reason: string): Pr
 
   // Notify the right person via SMS
   const client = twilio(
-    process.env.TWILIO_ACCOUNT_SID!,
-    process.env.TWILIO_AUTH_TOKEN!
+    process.env.TWILIO_API_KEY!,
+    process.env.TWILIO_API_SECRET!,
+    { accountSid: process.env.TWILIO_ACCOUNT_SID! }
   );
   const fromNumber =
     process.env.TWILIO_SELLER_NUMBER ??
