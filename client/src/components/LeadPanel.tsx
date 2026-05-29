@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { Contact, Message, Pipeline } from '../types'
 import { fetchMessages, sendMessage, markDNC, initiateCall, moveStage, patchContact } from '../api'
 import { usePipeline } from '../context/PipelineContext'
+import { NotesTab } from './NotesTab'
 
 interface Props {
   contact: Contact
@@ -47,10 +48,6 @@ export function LeadPanel({ contact, onClose, activeCallId }: Props) {
   const [zip, setZip] = useState(contact.zip ?? '')
   const [saving, setSaving] = useState(false)
 
-  // Notes
-  const [notes, setNotes] = useState(contact.notes ?? '')
-  const [savingNotes, setSavingNotes] = useState(false)
-
   // Reset form fields when contact switches
   useEffect(() => {
     setName(contact.name ?? '')
@@ -59,7 +56,6 @@ export function LeadPanel({ contact, onClose, activeCallId }: Props) {
     setCity(contact.city ?? '')
     setStateVal(contact.state ?? '')
     setZip(contact.zip ?? '')
-    setNotes(contact.notes ?? '')
   }, [contact.id])
 
   useEffect(() => {
@@ -120,16 +116,6 @@ export function LeadPanel({ contact, onClose, activeCallId }: Props) {
       dispatch({ type: 'UPSERT_CONTACT', contact: updated })
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handleSaveNotes() {
-    setSavingNotes(true)
-    try {
-      const updated = await patchContact(contact.id, { notes: notes || null })
-      dispatch({ type: 'UPSERT_CONTACT', contact: updated })
-    } finally {
-      setSavingNotes(false)
     }
   }
 
@@ -284,24 +270,7 @@ export function LeadPanel({ contact, onClose, activeCallId }: Props) {
       )}
 
       {/* Notes tab */}
-      {tab === 'notes' && (
-        <div className="flex-1 flex flex-col px-4 py-4 gap-3">
-          <label className="text-xs text-slate-500">Notes</label>
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Add notes about this contact…"
-            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-purple-500/50 resize-none transition-colors"
-          />
-          <button
-            onClick={handleSaveNotes}
-            disabled={savingNotes}
-            className="w-full py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {savingNotes ? 'Saving…' : 'Save Notes'}
-          </button>
-        </div>
-      )}
+      {tab === 'notes' && <NotesTab contactId={contact.id} />}
 
       {/* Bottom actions — always visible */}
       <div className="px-4 py-3 border-t border-white/10 shrink-0 flex flex-col gap-2">

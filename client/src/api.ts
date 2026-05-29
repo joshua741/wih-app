@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Contact, Message, Deal, PipelineStage, Pipeline, Agent } from './types'
+import type { Contact, Message, Deal, PipelineStage, Pipeline, Agent, Note, NoteFolder } from './types'
 
 const api = axios.create({ baseURL: '/api' })
 
@@ -35,6 +35,36 @@ export async function markDNC(id: string, reason?: string): Promise<void> {
 export async function initiateCall(contactPhone: string, agent: Agent): Promise<{ callSid: string }> {
   const res = await api.post('/call/initiate', { contactPhone, agent })
   return res.data
+}
+
+// ─── Notes & folders ───────────────────────────────────────────────
+
+export async function fetchNotes(contactId: string): Promise<{ notes: Note[]; folders: NoteFolder[] }> {
+  const res = await api.get(`/contacts/${contactId}/notes`)
+  return res.data
+}
+
+export async function createNote(contactId: string, body: string, folderId: string | null): Promise<Note> {
+  const res = await api.post(`/contacts/${contactId}/notes`, { body, folder_id: folderId })
+  return res.data
+}
+
+export async function updateNote(noteId: string, data: { body?: string; folder_id?: string | null }): Promise<Note> {
+  const res = await api.patch(`/notes/${noteId}`, data)
+  return res.data
+}
+
+export async function deleteNote(noteId: string): Promise<void> {
+  await api.delete(`/notes/${noteId}`)
+}
+
+export async function createNoteFolder(contactId: string, name: string): Promise<NoteFolder> {
+  const res = await api.post(`/contacts/${contactId}/note-folders`, { name })
+  return res.data
+}
+
+export async function deleteNoteFolder(folderId: string): Promise<void> {
+  await api.delete(`/note-folders/${folderId}`)
 }
 
 export async function fetchStages(): Promise<PipelineStage[]> {

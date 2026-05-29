@@ -142,6 +142,73 @@ apiRouter.post('/contacts/:id/messages', async (req: Request, res: Response) => 
   res.status(201).json(result.rows[0]);
 });
 
+// ─── NOTES & FOLDERS ─────────────────────────────────────────────────────────
+
+// GET /api/contacts/:id/notes — all notes + folders for a contact
+apiRouter.get('/contacts/:id/notes', async (req: Request, res: Response) => {
+  const [notes, folders] = await Promise.all([
+    pool.query(
+      'SELECT * FROM contact_notes WHERE contact_id = $1 ORDER BY created_at DESC',
+      [req.params.id]
+    ),
+    pool.query(
+      'SELECT * FROM note_folders WHERE contact_id = $1 ORDER BY name ASC',
+      [req.params.id]
+    ),
+  ]);
+  res.json({ notes: notes.rows, folders: folders.rows });
+});
+
+// POST /api/contacts/:id/notes — create a note
+apiRouter.post('/contacts/:id/notes', async (req: Request, res: Response) => {
+  const { body, folder_id } = req.body as { body: string; folder_id?: string | null };
+  if (!body || !body.trim()) { res.status(400).json({ error: 'body required' }); return; }
+  const result = await pool.query(
+    `INSERT INTO contact_notes (id, contact_id, folder_id, body)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [uuidv4(), req.params.id, folder_id ?? null, body.trim()]
+  );
+  res.status(201).json(result.rows[0]);
+});
+
+// PATCH /api/notes/:id — edit body and/or move to a folder
+apiRouter.patch('/notes/:id', async (req: Request, res: Response) => {
+  const allowed = ['body', 'folder_id'];
+  const updates = Object.entries(req.body).filter(([k]) => allowed.includes(k));
+  if (!updates.length) { res.status(400).json({ error: 'No valid fields' }); return; }
+
+  const sets = updates.map(([k], i) => `${k} = $${i + 2}`).join(', ');
+  const result = await pool.query(
+    `UPDATE contact_notes SET ${sets} WHERE id = $1 RETURNING *`,
+    [req.params.id, ...updates.map(([, v]) => v)]
+  );
+  if (!result.rows[0]) { res.status(404).json({ error: 'Not found' }); return; }
+  res.json(result.rows[0]);
+});
+
+// DELETE /api/notes/:id
+apiRouter.delete('/notes/:id', async (req: Request, res: Response) => {
+  await pool.query('DELETE FROM contact_notes WHERE id = $1', [req.params.id]);
+  res.sendStatus(204);
+});
+
+// POST /api/contacts/:id/note-folders — create a folder
+apiRouter.post('/contacts/:id/note-folders', async (req: Request, res: Response) => {
+  const { name } = req.body as { name: string };
+  if (!name || !name.trim()) { res.status(400).json({ error: 'name required' }); return; }
+  const result = await pool.query(
+    `INSERT INTO note_folders (id, contact_id, name) VALUES ($1, $2, $3) RETURNING *`,
+    [uuidv4(), req.params.id, name.trim()]
+  );
+  res.status(201).json(result.rows[0]);
+});
+
+// DELETE /api/note-folders/:id — deletes folder, notes inside fall back to unfiled
+apiRouter.delete('/note-folders/:id', async (req: Request, res: Response) => {
+  await pool.query('DELETE FROM note_folders WHERE id = $1', [req.params.id]);
+  res.sendStatus(204);
+});
+
 // ─── DEALS ───────────────────────────────────────────────────────────────────
 
 // GET /api/deals?stage_id=&assigned_to=

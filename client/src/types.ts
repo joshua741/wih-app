@@ -26,6 +26,22 @@ export interface Contact {
   updated_at: string
 }
 
+export interface NoteFolder {
+  id: string
+  contact_id: string
+  name: string
+  created_at: string
+}
+
+export interface Note {
+  id: string
+  contact_id: string
+  folder_id: string | null
+  body: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Message {
   id: string
   contact_id: string
