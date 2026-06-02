@@ -5,10 +5,12 @@ import { Sidebar } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
 import { KanbanBoard } from './components/KanbanBoard'
 import { LeadPanel } from './components/LeadPanel'
+import { DirectoryView } from './components/DirectoryView'
 import { usePipelineWebSocket } from './hooks/usePipelineWebSocket'
 import { usePipeline } from './context/PipelineContext'
 
 function Dashboard() {
+  const [view, setView] = useState<'pipeline' | 'directory'>('pipeline')
   const [pipeline, setPipeline] = useState<Pipeline>('agent_outreach')
   const [search, setSearch] = useState('')
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
@@ -21,6 +23,7 @@ function Dashboard() {
   }
 
   function handlePipelineChange(p: Pipeline) {
+    setView('pipeline')
     setPipeline(p)
     setSelectedContact(null)
     setSearch('')
@@ -28,25 +31,36 @@ function Dashboard() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0f0f1a]">
-      <Sidebar active={pipeline} onChange={handlePipelineChange} />
+      <Sidebar
+        active={pipeline}
+        view={view}
+        onChange={handlePipelineChange}
+        onSelectDirectory={() => { setView('directory'); setSelectedContact(null) }}
+      />
 
       <div className="flex flex-col flex-1 min-w-0">
-        <TopBar pipeline={pipeline} search={search} onSearch={setSearch} />
-        <div className="flex flex-1 min-h-0">
-          <KanbanBoard
-            pipeline={pipeline}
-            search={search}
-            selectedId={selectedContact?.id ?? null}
-            onSelect={handleSelect}
-          />
-          {selectedContact && (
-            <LeadPanel
-              contact={selectedContact}
-              onClose={() => setSelectedContact(null)}
-              activeCallId={activeCallId}
-            />
-          )}
-        </div>
+        {view === 'pipeline' ? (
+          <>
+            <TopBar pipeline={pipeline} search={search} onSearch={setSearch} />
+            <div className="flex flex-1 min-h-0">
+              <KanbanBoard
+                pipeline={pipeline}
+                search={search}
+                selectedId={selectedContact?.id ?? null}
+                onSelect={handleSelect}
+              />
+              {selectedContact && (
+                <LeadPanel
+                  contact={selectedContact}
+                  onClose={() => setSelectedContact(null)}
+                  activeCallId={activeCallId}
+                />
+              )}
+            </div>
+          </>
+        ) : (
+          <DirectoryView />
+        )}
       </div>
     </div>
   )
