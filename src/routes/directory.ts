@@ -159,3 +159,69 @@ directoryRouter.post('/bulk-tag', async (req, res) => {
     res.status(400).json({ error: (e as Error).message });
   }
 });
+
+// POST /api/directory/export — CSV of selected ids OR current filter
+directoryRouter.post('/export', async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    let rows;
+    if (Array.isArray(ids) && ids.length) {
+      rows = (await pool.query(
+        `SELECT full_name, phone, email, business_name, city, state, category,
+                array_to_string(tags,';') AS tags
+         FROM directory_contacts WHERE id = ANY($1) ORDER BY full_name`, [ids]
+      )).rows;
+    } else {
+      rows = (await pool.query(
+        `SELECT full_name, phone, email, business_name, city, state, category,
+                array_to_string(tags,';') AS tags
+         FROM directory_contacts WHERE is_junk = FALSE ORDER BY full_name LIMIT 5000`
+      )).rows;
+    }
+    const cols = ['full_name','phone','email','business_name','city','state','category','tags'];
+    const esc = (v: unknown) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [cols.join(',')]
+      .concat(rows.map(r => cols.map(c => esc((r as Record<string, unknown>)[c])).join(',')))
+      .join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="directory-export.csv"');
+    res.send(csv);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
+// POST /api/directory/promote — push selected into a pipeline
+directoryRouter.post('/promote', async (req, res) => {
+  try {
+    const { ids = [], pipeline, stageId, contactType = 'seller' } = req.body || {};
+    if (!Array.isArray(ids) || !ids.length || !pipeline) {
+      return res.status(400).json({ error: 'ids and pipeline required' });
+    }
+    const dir = (await pool.query(
+      `SELECT * FROM directory_contacts WHERE id = ANY($1)`, [ids]
+    )).rows;
+    let promoted = 0, skipped = 0;
+    for (const c of dir) {
+      if (!c.phone) { skipped++; continue; }
+      const ins = await pool.query(
+        `INSERT INTO contacts (phone, name, email, address, city, state, contact_type,
+                               source, pipeline, stage_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'directory',$8,$9)
+         ON CONFLICT (phone) DO NOTHING RETURNING id`,
+        [c.phone, c.full_name || null, c.email || null, c.address || null, c.city || null,
+         c.state || null, contactType, pipeline, stageId || null]
+      );
+      if ((ins.rowCount ?? 0) > 0) promoted++; else skipped++;
+    }
+    await pool.query(
+      `UPDATE directory_contacts SET promoted_to_pipeline = TRUE WHERE id = ANY($1)`, [ids]
+    );
+    res.json({ promoted, skipped });
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
