@@ -205,6 +205,7 @@ directoryRouter.post('/promote', async (req, res) => {
       `SELECT * FROM directory_contacts WHERE id = ANY($1)`, [ids]
     )).rows;
     let promoted = 0, skipped = 0;
+    const promotedIds: string[] = [];
     for (const c of dir) {
       if (!c.phone) { skipped++; continue; }
       const ins = await pool.query(
@@ -215,11 +216,13 @@ directoryRouter.post('/promote', async (req, res) => {
         [c.phone, c.full_name || null, c.email || null, c.address || null, c.city || null,
          c.state || null, contactType, pipeline, stageId || null]
       );
-      if ((ins.rowCount ?? 0) > 0) promoted++; else skipped++;
+      if ((ins.rowCount ?? 0) > 0) { promoted++; promotedIds.push(c.id); } else skipped++;
     }
-    await pool.query(
-      `UPDATE directory_contacts SET promoted_to_pipeline = TRUE WHERE id = ANY($1)`, [ids]
-    );
+    if (promotedIds.length) {
+      await pool.query(
+        `UPDATE directory_contacts SET promoted_to_pipeline = TRUE WHERE id = ANY($1)`, [promotedIds]
+      );
+    }
     res.json({ promoted, skipped });
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });
