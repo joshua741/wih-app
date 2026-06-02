@@ -257,3 +257,42 @@ INSERT INTO pipeline_stages (name, pipeline, position, color) VALUES
   ('Title/Escrow',        'active_deals',    2, '#059669'),
   ('Closed',              'active_deals',    3, '#047857')
 ON CONFLICT (name) DO NOTHING;
+
+-- Contacts Directory (master rolodex, isolated from pipeline contacts)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE TABLE IF NOT EXISTS directory_contacts (
+  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ghl_contact_id       TEXT UNIQUE,
+  first_name           TEXT,
+  last_name            TEXT,
+  full_name            TEXT,
+  phone                TEXT,
+  phone_normalized     TEXT,
+  email                TEXT,
+  email_lower          TEXT,
+  business_name        TEXT,
+  address              TEXT,
+  city                 TEXT,
+  state                TEXT,
+  postal_code          TEXT,
+  category             TEXT NOT NULL DEFAULT 'uncategorized',
+  categories           TEXT[] NOT NULL DEFAULT '{}',
+  tags                 TEXT[] NOT NULL DEFAULT '{}',
+  is_junk              BOOLEAN NOT NULL DEFAULT FALSE,
+  promoted_to_pipeline BOOLEAN NOT NULL DEFAULT FALSE,
+  data                 JSONB NOT NULL DEFAULT '{}',
+  created_at           TIMESTAMPTZ DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dir_phone      ON directory_contacts(phone_normalized);
+CREATE INDEX IF NOT EXISTS idx_dir_email      ON directory_contacts(email_lower);
+CREATE INDEX IF NOT EXISTS idx_dir_category   ON directory_contacts(category);
+CREATE INDEX IF NOT EXISTS idx_dir_name_trgm  ON directory_contacts USING gin (full_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_dir_tags       ON directory_contacts USING gin (tags);
+CREATE INDEX IF NOT EXISTS idx_dir_data       ON directory_contacts USING gin (data jsonb_path_ops);
+
+CREATE OR REPLACE TRIGGER directory_contacts_updated_at
+  BEFORE UPDATE ON directory_contacts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();

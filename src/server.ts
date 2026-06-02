@@ -6,6 +6,7 @@ import path from 'path';
 import { smsRouter } from './routes/sms';
 import { voiceRouter } from './routes/voice';
 import { apiRouter } from './routes/api';
+import { directoryRouter } from './routes/directory';
 import { initWebSocket } from './websocket/server';
 import { pool } from './db/pool';
 
@@ -19,6 +20,7 @@ app.use(express.json());
 
 app.use('/webhooks/sms', smsRouter);
 app.use('/webhooks/voice', voiceRouter);
+app.use('/api/directory', directoryRouter);
 app.use('/api', apiRouter);
 
 app.get('/health', (_req, res) => {

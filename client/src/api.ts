@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Contact, Message, Deal, PipelineStage, Pipeline, Agent, Note, NoteFolder } from './types'
+import type { Contact, Message, Deal, PipelineStage, Pipeline, Agent, Note, NoteFolder, DirectoryContact, DirectoryContactDetail, DirectoryListResult, FilterSpec } from './types'
 
 const api = axios.create({ baseURL: '/api' })
 
@@ -81,3 +81,61 @@ export async function fetchDeals(params?: { stage_id?: string; assigned_to?: Age
   const res = await api.get('/deals', { params })
   return res.data.deals
 }
+
+// ─── Contacts Directory ───────────────────────────────────────────
+
+export async function fetchDirectory(params: {
+  search?: string; category?: string; include_junk?: boolean;
+  filters?: FilterSpec; page?: number; pageSize?: number;
+}): Promise<DirectoryListResult> {
+  const res = await api.get('/directory/contacts', {
+    params: {
+      search: params.search || undefined,
+      category: params.category || undefined,
+      include_junk: params.include_junk || undefined,
+      filters: params.filters ? JSON.stringify(params.filters) : undefined,
+      page: params.page || 1,
+      pageSize: params.pageSize || 50,
+    },
+  })
+  return res.data
+}
+
+export async function fetchDirectoryContact(id: string): Promise<DirectoryContactDetail> {
+  const res = await api.get(`/directory/contacts/${id}`)
+  return res.data
+}
+
+export async function fetchDirectoryFields(): Promise<{ core: string[]; jsonb: string[] }> {
+  const res = await api.get('/directory/fields')
+  return res.data
+}
+
+export async function patchDirectoryContact(
+  id: string, data: Partial<DirectoryContact>
+): Promise<DirectoryContact> {
+  const res = await api.patch(`/directory/contacts/${id}`, data)
+  return res.data
+}
+
+export async function createDirectoryContact(
+  data: Partial<DirectoryContact>
+): Promise<DirectoryContact> {
+  const res = await api.post('/directory/contacts', data)
+  return res.data
+}
+
+export async function bulkTagDirectory(
+  ids: string[], category?: string, addTags?: string[]
+): Promise<void> {
+  await api.post('/directory/bulk-tag', { ids, category, addTags })
+}
+
+export async function promoteDirectory(
+  ids: string[], pipeline: string, contactType: string, stageId?: string
+): Promise<{ promoted: number; skipped: number }> {
+  const res = await api.post('/directory/promote', { ids, pipeline, contactType, stageId })
+  return res.data
+}
+
+export function exportDirectoryUrl(): string { return '/api/directory/export' }
