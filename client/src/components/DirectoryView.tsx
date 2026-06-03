@@ -92,12 +92,12 @@ export function DirectoryView() {
         {checked.size > 0 && (
           <div className="flex items-center gap-3 px-4 py-2 bg-purple-600/20 border-b border-purple-500/30 text-sm">
             <span className="text-purple-200">{checked.size} selected</span>
-            <select defaultValue="" onChange={e => { applyBulkLabel(e.target.value, 'add'); e.target.value = '' }}
+            <select value="" onChange={e => { applyBulkLabel(e.target.value, 'add'); e.target.value = '' }}
               className="bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-slate-200 text-xs">
               <option value="">+ Add label…</option>
               {allLabels.filter(l => l !== 'uncategorized').map(l => <option key={l} value={l}>{l}</option>)}
             </select>
-            <select defaultValue="" onChange={e => { applyBulkLabel(e.target.value, 'remove'); e.target.value = '' }}
+            <select value="" onChange={e => { applyBulkLabel(e.target.value, 'remove'); e.target.value = '' }}
               className="bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-slate-200 text-xs">
               <option value="">− Remove label…</option>
               {allLabels.filter(l => l !== 'uncategorized').map(l => <option key={l} value={l}>{l}</option>)}
