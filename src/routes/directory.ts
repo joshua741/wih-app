@@ -196,6 +196,43 @@ directoryRouter.post('/bulk-tag', async (req, res) => {
   }
 });
 
+// POST /api/directory/bulk-label — add and/or remove labels on a set of ids
+directoryRouter.post('/bulk-label', async (req, res) => {
+  try {
+    const { ids = [], add = [], remove = [] } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+
+    if (Array.isArray(remove) && remove.length) {
+      await pool.query(
+        `UPDATE directory_contacts
+         SET categories = COALESCE(
+           (SELECT array_agg(c) FROM unnest(categories) c WHERE c <> ALL($1::text[])), '{}')
+         WHERE id = ANY($2)`,
+        [remove, ids]
+      );
+    }
+    if (Array.isArray(add) && add.length) {
+      await pool.query(
+        `UPDATE directory_contacts
+         SET categories = (SELECT array_agg(DISTINCT x) FROM unnest(categories || $1::text[]) x)
+         WHERE id = ANY($2)`,
+        [add, ids]
+      );
+    }
+    // Keep singular category in sync (first label, or 'uncategorized' if empty).
+    await pool.query(
+      `UPDATE directory_contacts
+       SET category = COALESCE(NULLIF(categories[1], ''), 'uncategorized'),
+           categories = CASE WHEN cardinality(categories) = 0 THEN '{uncategorized}' ELSE categories END
+       WHERE id = ANY($1)`,
+      [ids]
+    );
+    res.json({ updated: ids.length });
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
 // POST /api/directory/export — CSV of selected ids OR current filter
 directoryRouter.post('/export', async (req, res) => {
   try {
