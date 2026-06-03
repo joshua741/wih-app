@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool';
 import { normalizePhone } from '../lib/normalize';
 import { buildFilterSql, FilterSpec } from '../lib/filterSpec';
+import { ALL_CATEGORIES } from '../lib/categorize';
 
 export const directoryRouter = Router();
 
@@ -120,6 +121,35 @@ directoryRouter.patch('/contacts/:id', async (req, res) => {
       `UPDATE directory_contacts SET ${sets.join(', ')} WHERE id = $${n} RETURNING *`, params
     );
     res.json(r.rows[0]);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
+// GET /api/directory/labels — the full label set (for editors/sidebars)
+directoryRouter.get('/labels', (_req, res) => {
+  res.json({ labels: ALL_CATEGORIES });
+});
+
+// GET /api/directory/label-counts — count per label (non-junk), plus totals
+directoryRouter.get('/label-counts', async (_req, res) => {
+  try {
+    const counts = await pool.query(
+      `SELECT label, count(*)::int AS n
+       FROM (SELECT id, unnest(categories) AS label
+             FROM directory_contacts WHERE is_junk = FALSE) s
+       GROUP BY label ORDER BY n DESC`
+    );
+    const totals = await pool.query(
+      `SELECT count(*) FILTER (WHERE NOT is_junk)::int AS total_active,
+              count(*) FILTER (WHERE is_junk)::int AS junk
+       FROM directory_contacts`
+    );
+    res.json({
+      labels: counts.rows,
+      total_active: totals.rows[0].total_active,
+      junk: totals.rows[0].junk,
+    });
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });
   }
