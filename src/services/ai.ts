@@ -227,7 +227,11 @@ async function applyActions(
 
   // Mark contact dead
   if (actions.dead) {
-    const deadStageId = await getStageId('Dead', contact.pipeline);
+    const deadRes = await pool.query<{ id: string }>(
+      `SELECT id FROM pipeline_stages WHERE pipeline = $1 AND name LIKE 'Dead%' LIMIT 1`,
+      [contact.pipeline]
+    );
+    const deadStageId = deadRes.rows[0]?.id ?? null;
     await pool.query(
       `UPDATE contacts SET ai_active = FALSE, stage_id = COALESCE($1, stage_id) WHERE id = $2`,
       [deadStageId, contact.id]
