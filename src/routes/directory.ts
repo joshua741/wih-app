@@ -3,6 +3,7 @@ import { pool } from '../db/pool';
 import { normalizePhone } from '../lib/normalize';
 import { buildFilterSql, FilterSpec } from '../lib/filterSpec';
 import { ALL_CATEGORIES } from '../lib/categorize';
+import { startOutreach } from '../services/outreach';
 
 export const directoryRouter = Router();
 
@@ -297,6 +298,21 @@ directoryRouter.post('/promote', async (req, res) => {
       );
     }
     res.json({ promoted, skipped });
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
+// POST /api/directory/start-outreach — Vince sends a first text to selected directory contacts
+directoryRouter.post('/start-outreach', async (req, res) => {
+  try {
+    const { ids = [], pipeline } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+    if (pipeline !== 'agent_outreach' && pipeline !== 'seller_inbound') {
+      return res.status(400).json({ error: 'pipeline must be agent_outreach or seller_inbound' });
+    }
+    const result = await startOutreach({ ids, pipeline });
+    res.json(result);
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });
   }
