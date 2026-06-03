@@ -10,7 +10,7 @@
     "migrate": "ts-node src/db/migrate.ts",
     "test": "node --require ts-node/register/transpile-only --test src/lib/csv.test.ts src/lib/normalize.test.ts src/lib/categorize.test.ts src/lib/filterSpec.test.ts src/lib/pipelineRouting.test.ts",
     "import-contacts": "ts-node src/db/importContacts.ts",
-    "set-webhooks": "ts-node src/scripts/set-twilio-webhooks.ts",
+    "set-webhooks": "ts-node --transpile-only src/scripts/set-twilio-webhooks.ts",
     "list-webhooks": "ts-node --transpile-only src/scripts/list-twilio-webhooks.ts",
     "recategorize:dry": "ts-node src/db/recategorize.ts --dry-run",
     "recategorize": "ts-node src/db/recategorize.ts"
