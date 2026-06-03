@@ -252,6 +252,9 @@ INSERT INTO pipeline_stages (name, pipeline, position, color) VALUES
   ('Qualified',           'seller_inbound',  3, '#ef4444'),
   ('Offer Made',          'seller_inbound',  4, '#dc2626'),
   ('Under Contract',      'seller_inbound',  5, '#b91c1c'),
+  -- Dead stages (used when Vince tags a lead [DEAD])
+  ('Dead (Agent)',  'agent_outreach', 99, '#64748b'),
+  ('Dead (Seller)', 'seller_inbound', 99, '#64748b'),
   -- Active Deals pipeline
   ('Due Diligence',       'active_deals',    1, '#10b981'),
   ('Title/Escrow',        'active_deals',    2, '#059669'),

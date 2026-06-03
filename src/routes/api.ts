@@ -129,7 +129,7 @@ apiRouter.post('/contacts/:id/messages', async (req: Request, res: Response) => 
     to: toPhone,
     from: twilioNumber,
     body,
-    statusCallback: `${process.env.WEBHOOK_BASE_URL}/sms/status`,
+    statusCallback: `${process.env.WEBHOOK_BASE_URL}/webhooks/sms/status`,
   });
 
   const result = await pool.query(

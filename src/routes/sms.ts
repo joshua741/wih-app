@@ -3,6 +3,7 @@ import twilio from 'twilio';
 import { pool } from '../db/pool';
 import { broadcast } from '../websocket/server';
 import { v4 as uuidv4 } from 'uuid';
+import { pipelineForNumber, contactTypeForPipeline, firstStageName } from '../lib/pipelineRouting';
 
 export const smsRouter = Router();
 
@@ -18,13 +19,17 @@ smsRouter.post('/', async (req: Request, res: Response) => {
       Body,
     } = req.body as { MessageSid: string; From: string; To: string; Body: string };
 
-    // 1. Upsert contact
+    const pipeline = pipelineForNumber(To);
+    const contactType = contactTypeForPipeline(pipeline);
+    const stageName = firstStageName(pipeline);
+
+    // 1. Upsert contact — pipeline/type/stage are chosen by which WIH number was texted.
     const contactResult = await pool.query<{ id: string; is_dnc: boolean; human_takeover: boolean; ai_active: boolean }>(
-      `INSERT INTO contacts (id, phone, source, pipeline)
-       VALUES ($1, $2, 'seller_inbound', 'seller_inbound')
+      `INSERT INTO contacts (id, phone, source, pipeline, contact_type, stage_id)
+       VALUES ($1, $2, $3, $3, $4, (SELECT id FROM pipeline_stages WHERE name = $5))
        ON CONFLICT (phone) DO UPDATE SET updated_at = NOW()
        RETURNING id, is_dnc, human_takeover, ai_active`,
-      [uuidv4(), From]
+      [uuidv4(), From, pipeline, contactType, stageName]
     );
     const contact = contactResult.rows[0];
 

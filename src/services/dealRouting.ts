@@ -90,8 +90,9 @@ export async function sendNotification(
   message: string
 ): Promise<void> {
   const client = twilio(
-    process.env.TWILIO_ACCOUNT_SID!,
-    process.env.TWILIO_AUTH_TOKEN!
+    process.env.TWILIO_API_KEY!,
+    process.env.TWILIO_API_SECRET!,
+    { accountSid: process.env.TWILIO_ACCOUNT_SID! }
   );
 
   // Use the seller AI number as the from number for notifications
