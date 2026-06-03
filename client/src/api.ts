@@ -141,6 +141,11 @@ export async function promoteDirectory(
   return res.data
 }
 
+export async function startOutreachApi(ids: string[], pipeline: string): Promise<{ queued: number }> {
+  const res = await api.post('/directory/start-outreach', { ids, pipeline })
+  return res.data
+}
+
 export async function fetchLabelCounts(): Promise<LabelCounts> {
   const res = await api.get('/directory/label-counts')
   return res.data
