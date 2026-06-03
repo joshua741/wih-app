@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { DirectoryContact, FilterSpec } from '../types'
-import { fetchDirectory, bulkLabelDirectory, fetchLabels } from '../api'
+import { fetchDirectory, bulkLabelDirectory, fetchLabels, startOutreachApi } from '../api'
 import { DirectoryDetailPanel } from './DirectoryDetailPanel'
 import { AdvancedFilterPanel } from './AdvancedFilterPanel'
 import { LabelSidebar, type LabelSelection } from './LabelSidebar'
@@ -17,6 +17,7 @@ export function DirectoryView() {
   const [sel, setSel] = useState<LabelSelection>({ label: null, junk: false })
   const [version, setVersion] = useState(0)
   const [allLabels, setAllLabels] = useState<string[]>([])
+  const [outreachOpen, setOutreachOpen] = useState(false)
   const pageSize = 50
 
   useEffect(() => { fetchLabels().then(setAllLabels) }, [])
@@ -48,6 +49,15 @@ export function DirectoryView() {
     const ids = Array.from(checked)
     if (!ids.length || !label) return
     await bulkLabelDirectory(ids, mode === 'add' ? [label] : [], mode === 'remove' ? [label] : [])
+    setChecked(new Set()); load(); bumpCounts()
+  }
+
+  async function startOutreach(pipeline: 'agent_outreach' | 'seller_inbound') {
+    const ids = Array.from(checked)
+    if (!ids.length) return
+    const r = await startOutreachApi(ids, pipeline)
+    alert(`Outreach queued for ${r.queued} contact(s).`)
+    setOutreachOpen(false)
     setChecked(new Set()); load(); bumpCounts()
   }
 
@@ -102,6 +112,18 @@ export function DirectoryView() {
               <option value="">− Remove label…</option>
               {allLabels.filter(l => l !== 'uncategorized').map(l => <option key={l} value={l}>{l}</option>)}
             </select>
+            {!outreachOpen ? (
+              <button onClick={() => setOutreachOpen(true)} className="text-slate-200 hover:text-white">Start outreach</button>
+            ) : (
+              <span className="flex items-center gap-2">
+                <span className="text-purple-200">Send first text via:</span>
+                <button onClick={() => startOutreach('agent_outreach')}
+                  className="px-2 py-0.5 rounded bg-blue-600/30 text-blue-200 text-xs hover:bg-blue-600/50">Agent</button>
+                <button onClick={() => startOutreach('seller_inbound')}
+                  className="px-2 py-0.5 rounded bg-amber-600/30 text-amber-200 text-xs hover:bg-amber-600/50">Seller</button>
+                <button onClick={() => setOutreachOpen(false)} className="text-slate-400 hover:text-white text-xs">cancel</button>
+              </span>
+            )}
             <button onClick={exportCsv} className="text-slate-200 hover:text-white">Export CSV</button>
             <button onClick={() => setChecked(new Set())} className="text-slate-400 hover:text-white">Clear</button>
           </div>
