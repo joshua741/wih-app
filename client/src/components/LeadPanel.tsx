@@ -46,6 +46,9 @@ export function LeadPanel({ contact, onClose, activeCallId }: Props) {
   const [city, setCity] = useState(contact.city ?? '')
   const [stateVal, setStateVal] = useState(contact.state ?? '')
   const [zip, setZip] = useState(contact.zip ?? '')
+  const [immediateGoal, setImmediateGoal] = useState(contact.immediate_goal ?? '')
+  const [longTermGoal, setLongTermGoal] = useState(contact.long_term_goal ?? '')
+  const [goalOwner, setGoalOwner] = useState<'josh' | 'angel'>(contact.goal_owner ?? 'angel')
   const [saving, setSaving] = useState(false)
 
   // Reset form fields when contact switches
@@ -56,6 +59,9 @@ export function LeadPanel({ contact, onClose, activeCallId }: Props) {
     setCity(contact.city ?? '')
     setStateVal(contact.state ?? '')
     setZip(contact.zip ?? '')
+    setImmediateGoal(contact.immediate_goal ?? '')
+    setLongTermGoal(contact.long_term_goal ?? '')
+    setGoalOwner(contact.goal_owner ?? 'angel')
   }, [contact.id])
 
   useEffect(() => {
@@ -112,6 +118,9 @@ export function LeadPanel({ contact, onClose, activeCallId }: Props) {
         city: city || null,
         state: stateVal || null,
         zip: zip || null,
+        immediate_goal: immediateGoal || null,
+        long_term_goal: longTermGoal || null,
+        goal_owner: goalOwner,
       })
       dispatch({ type: 'UPSERT_CONTACT', contact: updated })
     } finally {
@@ -259,6 +268,33 @@ export function LeadPanel({ contact, onClose, activeCallId }: Props) {
           <Field label="Stage">
             <div className={readonlyCls}>{contact.stage_name ?? '—'}</div>
           </Field>
+          <div className="border-t border-white/10 pt-3 mt-1 flex flex-col gap-3">
+            <div className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">
+              Goal {contact.goal_status === 'met' && <span className="ml-1 text-emerald-400">· met</span>}
+            </div>
+            <Field label="Immediate goal">
+              <textarea value={immediateGoal} onChange={e => setImmediateGoal(e.target.value)}
+                rows={2} placeholder="What Vince is driving toward now"
+                className={inputCls + ' resize-none'} />
+            </Field>
+            <Field label="Long-term goal">
+              <textarea value={longTermGoal} onChange={e => setLongTermGoal(e.target.value)}
+                rows={2} placeholder="Why we stay in touch"
+                className={inputCls + ' resize-none'} />
+            </Field>
+            <Field label="Owner">
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setGoalOwner('angel')}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${goalOwner === 'angel' ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500/40' : 'bg-white/5 text-slate-400 border-white/10'}`}>
+                  Angel
+                </button>
+                <button type="button" onClick={() => setGoalOwner('josh')}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${goalOwner === 'josh' ? 'bg-blue-600/30 text-blue-300 border-blue-500/40' : 'bg-white/5 text-slate-400 border-white/10'}`}>
+                  Josh
+                </button>
+              </div>
+            </Field>
+          </div>
           <button
             onClick={handleSaveDetails}
             disabled={saving}
