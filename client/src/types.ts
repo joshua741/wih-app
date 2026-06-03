@@ -93,6 +93,7 @@ export interface DirectoryContact {
   full_name: string | null
   phone: string | null
   email: string | null
+  address: string | null
   business_name: string | null
   city: string | null
   state: string | null
@@ -132,4 +133,10 @@ export interface DirectoryListResult {
   total: number
   page: number
   pageSize: number
+}
+
+export interface LabelCounts {
+  labels: { label: string; n: number }[]
+  total_active: number
+  junk: number
 }

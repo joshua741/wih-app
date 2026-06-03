@@ -3,6 +3,11 @@ export type Category =
   | 'title_agent' | 'insurance_agent' | 'contractor' | 'realtor' | 'team'
   | 'uncategorized';
 
+export const ALL_CATEGORIES: Category[] = [
+  'buyer', 'seller', 'rto_tenant', 'cash_buyer', 'pml', 'wholesaler',
+  'title_agent', 'insurance_agent', 'contractor', 'realtor', 'team', 'uncategorized',
+];
+
 export interface CategoryResult {
   category: Category;
   categories: Category[];
@@ -55,7 +60,7 @@ const TAG_MAP: Record<string, Category> = {
 
 const JUNK_TAGS = new Set([
   'landline', 'spam likely', 'dead number', "couldn't find caller name",
-  'name via lookup', 'ghost', 'dnd',
+  'name via lookup', 'ghost', 'dnd', 'wrong number', 'disconnected',
 ]);
 
 // Field clusters: if any of these keys is non-empty -> category.
@@ -66,6 +71,16 @@ const FIELD_CLUSTERS: { category: Category; fields: string[] }[] = [
   { category: 'insurance_agent', fields: ['Insurance Agents Name', 'Our Insurance Agent Name'] },
   { category: 'buyer', fields: ['Max Amount Per Month ($)', 'Credit Score Range', 'Program Interest'] },
   { category: 'seller', fields: ['How Soon Are You Looking To Sell?', 'Asking Price'] },
+];
+
+// Field VALUE -> category (lowercased exact match on the cell's value).
+const VALUE_RULES: { field: string; map: Record<string, Category> }[] = [
+  { field: 'Possible Exit Strategy', map: {
+    'wholesale (sub 2)': 'seller',
+    'wholesale (cash)': 'seller',
+    'wholesale (seller finance)': 'seller',
+    'in house (rent to own)': 'rto_tenant',
+  } },
 ];
 
 function nonEmpty(v: unknown): boolean {
@@ -84,6 +99,13 @@ export function categorize(row: Record<string, string>, tags: string[]): Categor
   // 2. Field clusters
   for (const cluster of FIELD_CLUSTERS) {
     if (cluster.fields.some(f => nonEmpty(row[f]))) add(cluster.category);
+  }
+
+  // 3. Field value rules
+  for (const vr of VALUE_RULES) {
+    const v = (row[vr.field] || '').trim().toLowerCase();
+    const mapped = v ? vr.map[v] : undefined;
+    if (mapped) add(mapped);
   }
 
   const category: Category = cats[0] ?? 'uncategorized';

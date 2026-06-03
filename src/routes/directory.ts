@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool';
 import { normalizePhone } from '../lib/normalize';
 import { buildFilterSql, FilterSpec } from '../lib/filterSpec';
+import { ALL_CATEGORIES } from '../lib/categorize';
 
 export const directoryRouter = Router();
 
@@ -11,15 +12,21 @@ directoryRouter.get('/contacts', async (req, res) => {
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
     const pageSize = Math.min(200, Math.max(1, parseInt(String(req.query.pageSize || '50'), 10)));
     const search = String(req.query.search || '').trim();
-    const category = String(req.query.category || '').trim();
-    const includeJunk = String(req.query.include_junk || '') === 'true';
 
     const where: string[] = [];
     const params: unknown[] = [];
     let n = 1;
 
-    if (!includeJunk) where.push('is_junk = FALSE');
+    const includeJunk = String(req.query.include_junk || '') === 'true';
+    const onlyJunk = String(req.query.only_junk || '') === 'true';
+    const category = String(req.query.category || '').trim();
+    const label = String(req.query.label || '').trim();
+
+    if (onlyJunk) where.push('is_junk = TRUE');
+    else if (!includeJunk) where.push('is_junk = FALSE');
+
     if (category) { where.push(`category = $${n++}`); params.push(category); }
+    if (label) { where.push(`$${n++} = ANY(categories)`); params.push(label); }
     if (search) {
       const digits = normalizePhone(search);
       where.push(
@@ -41,8 +48,8 @@ directoryRouter.get('/contacts', async (req, res) => {
     const total = parseInt(countRes.rows[0].count, 10);
 
     const listRes = await pool.query(
-      `SELECT id, ghl_contact_id, full_name, phone, email, business_name, city, state,
-              category, categories, tags, is_junk, promoted_to_pipeline
+      `SELECT id, ghl_contact_id, full_name, phone, email, business_name, address, city, state,
+              postal_code, category, categories, tags, is_junk, promoted_to_pipeline
        FROM directory_contacts ${whereSql}
        ORDER BY full_name NULLS LAST
        LIMIT $${n++} OFFSET $${n++}`,
@@ -119,6 +126,35 @@ directoryRouter.patch('/contacts/:id', async (req, res) => {
   }
 });
 
+// GET /api/directory/labels — the full label set (for editors/sidebars)
+directoryRouter.get('/labels', (_req, res) => {
+  res.json({ labels: ALL_CATEGORIES });
+});
+
+// GET /api/directory/label-counts — count per label (non-junk), plus totals
+directoryRouter.get('/label-counts', async (_req, res) => {
+  try {
+    const counts = await pool.query(
+      `SELECT label, count(*)::int AS n
+       FROM (SELECT id, unnest(categories) AS label
+             FROM directory_contacts WHERE is_junk = FALSE) s
+       GROUP BY label ORDER BY n DESC`
+    );
+    const totals = await pool.query(
+      `SELECT count(*) FILTER (WHERE NOT is_junk)::int AS total_active,
+              count(*) FILTER (WHERE is_junk)::int AS junk
+       FROM directory_contacts`
+    );
+    res.json({
+      labels: counts.rows,
+      total_active: totals.rows[0].total_active,
+      junk: totals.rows[0].junk,
+    });
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
 // GET /api/directory/fields — filterable field list for the filter builder
 directoryRouter.get('/fields', async (_req, res) => {
   try {
@@ -154,6 +190,43 @@ directoryRouter.post('/bulk-tag', async (req, res) => {
         [addTags, ids]
       );
     }
+    res.json({ updated: ids.length });
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
+// POST /api/directory/bulk-label — add and/or remove labels on a set of ids
+directoryRouter.post('/bulk-label', async (req, res) => {
+  try {
+    const { ids = [], add = [], remove = [] } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+
+    if (Array.isArray(remove) && remove.length) {
+      await pool.query(
+        `UPDATE directory_contacts
+         SET categories = COALESCE(
+           (SELECT array_agg(c) FROM unnest(categories) c WHERE c <> ALL($1::text[])), '{}')
+         WHERE id = ANY($2)`,
+        [remove, ids]
+      );
+    }
+    if (Array.isArray(add) && add.length) {
+      await pool.query(
+        `UPDATE directory_contacts
+         SET categories = (SELECT array_agg(DISTINCT x) FROM unnest(categories || $1::text[]) x)
+         WHERE id = ANY($2)`,
+        [add, ids]
+      );
+    }
+    // Keep singular category in sync (first label, or 'uncategorized' if empty).
+    await pool.query(
+      `UPDATE directory_contacts
+       SET category = COALESCE(NULLIF(categories[1], ''), 'uncategorized'),
+           categories = CASE WHEN cardinality(categories) = 0 THEN '{uncategorized}' ELSE categories END
+       WHERE id = ANY($1)`,
+      [ids]
+    );
     res.json({ updated: ids.length });
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });

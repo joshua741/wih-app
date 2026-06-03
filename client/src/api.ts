@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Contact, Message, Deal, PipelineStage, Pipeline, Agent, Note, NoteFolder, DirectoryContact, DirectoryContactDetail, DirectoryListResult, FilterSpec } from './types'
+import type { Contact, Message, Deal, PipelineStage, Pipeline, Agent, Note, NoteFolder, DirectoryContact, DirectoryContactDetail, DirectoryListResult, FilterSpec, LabelCounts } from './types'
 
 const api = axios.create({ baseURL: '/api' })
 
@@ -85,14 +85,17 @@ export async function fetchDeals(params?: { stage_id?: string; assigned_to?: Age
 // ─── Contacts Directory ───────────────────────────────────────────
 
 export async function fetchDirectory(params: {
-  search?: string; category?: string; include_junk?: boolean;
+  search?: string; category?: string; label?: string;
+  include_junk?: boolean; only_junk?: boolean;
   filters?: FilterSpec; page?: number; pageSize?: number;
 }): Promise<DirectoryListResult> {
   const res = await api.get('/directory/contacts', {
     params: {
       search: params.search || undefined,
       category: params.category || undefined,
+      label: params.label || undefined,
       include_junk: params.include_junk || undefined,
+      only_junk: params.only_junk || undefined,
       filters: params.filters ? JSON.stringify(params.filters) : undefined,
       page: params.page || 1,
       pageSize: params.pageSize || 50,
@@ -136,6 +139,22 @@ export async function promoteDirectory(
 ): Promise<{ promoted: number; skipped: number }> {
   const res = await api.post('/directory/promote', { ids, pipeline, contactType, stageId })
   return res.data
+}
+
+export async function fetchLabelCounts(): Promise<LabelCounts> {
+  const res = await api.get('/directory/label-counts')
+  return res.data
+}
+
+export async function fetchLabels(): Promise<string[]> {
+  const res = await api.get('/directory/labels')
+  return res.data.labels
+}
+
+export async function bulkLabelDirectory(
+  ids: string[], add: string[], remove: string[]
+): Promise<void> {
+  await api.post('/directory/bulk-label', { ids, add, remove })
 }
 
 export function exportDirectoryUrl(): string { return '/api/directory/export' }
