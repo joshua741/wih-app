@@ -39,6 +39,12 @@ CREATE TABLE IF NOT EXISTS contacts (
   updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Goal engine: per-contact immediate + long-term goals, owner, status
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS immediate_goal TEXT;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS long_term_goal TEXT;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS goal_owner TEXT CHECK (goal_owner IN ('josh','angel'));
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS goal_status TEXT NOT NULL DEFAULT 'active' CHECK (goal_status IN ('active','met'));
+
 -- Conversations: one per contact (main thread)
 CREATE TABLE IF NOT EXISTS conversations (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
