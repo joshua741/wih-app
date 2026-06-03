@@ -11,15 +11,21 @@ directoryRouter.get('/contacts', async (req, res) => {
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
     const pageSize = Math.min(200, Math.max(1, parseInt(String(req.query.pageSize || '50'), 10)));
     const search = String(req.query.search || '').trim();
-    const category = String(req.query.category || '').trim();
-    const includeJunk = String(req.query.include_junk || '') === 'true';
 
     const where: string[] = [];
     const params: unknown[] = [];
     let n = 1;
 
-    if (!includeJunk) where.push('is_junk = FALSE');
+    const includeJunk = String(req.query.include_junk || '') === 'true';
+    const onlyJunk = String(req.query.only_junk || '') === 'true';
+    const category = String(req.query.category || '').trim();
+    const label = String(req.query.label || '').trim();
+
+    if (onlyJunk) where.push('is_junk = TRUE');
+    else if (!includeJunk) where.push('is_junk = FALSE');
+
     if (category) { where.push(`category = $${n++}`); params.push(category); }
+    if (label) { where.push(`$${n++} = ANY(categories)`); params.push(label); }
     if (search) {
       const digits = normalizePhone(search);
       where.push(
@@ -41,8 +47,8 @@ directoryRouter.get('/contacts', async (req, res) => {
     const total = parseInt(countRes.rows[0].count, 10);
 
     const listRes = await pool.query(
-      `SELECT id, ghl_contact_id, full_name, phone, email, business_name, city, state,
-              category, categories, tags, is_junk, promoted_to_pipeline
+      `SELECT id, ghl_contact_id, full_name, phone, email, business_name, address, city, state,
+              postal_code, category, categories, tags, is_junk, promoted_to_pipeline
        FROM directory_contacts ${whereSql}
        ORDER BY full_name NULLS LAST
        LIMIT $${n++} OFFSET $${n++}`,
