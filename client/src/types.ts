@@ -22,6 +22,10 @@ export interface Contact {
   zip: string | null
   notes: string | null
   metadata: Record<string, unknown>
+  immediate_goal: string | null
+  long_term_goal: string | null
+  goal_owner: 'josh' | 'angel' | null
+  goal_status: string
   created_at: string
   updated_at: string
 }

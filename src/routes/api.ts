@@ -62,7 +62,7 @@ apiRouter.post('/contacts', async (req: Request, res: Response) => {
 
 // PATCH /api/contacts/:id
 apiRouter.patch('/contacts/:id', async (req: Request, res: Response) => {
-  const allowed = ['name','email','address','city','state','zip','stage_id','pipeline','is_dnc','dnc_reason','human_takeover','takeover_by','ai_active','notes','metadata'];
+  const allowed = ['name','email','address','city','state','zip','stage_id','pipeline','is_dnc','dnc_reason','human_takeover','takeover_by','ai_active','notes','metadata','immediate_goal','long_term_goal','goal_owner'];
   const updates = Object.entries(req.body).filter(([k]) => allowed.includes(k));
   if (!updates.length) { res.status(400).json({ error: 'No valid fields' }); return; }
 

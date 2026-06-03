@@ -3,6 +3,7 @@ import twilio from 'twilio';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db/pool';
 import { broadcast } from '../websocket/server';
+import { goalsForPipeline, buildGoalBlock } from '../lib/goals';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -96,6 +97,10 @@ interface Contact {
   ai_active: boolean;
   is_dnc: boolean;
   metadata: Record<string, unknown>;
+  immediate_goal: string | null;
+  long_term_goal: string | null;
+  goal_owner: 'josh' | 'angel' | null;
+  goal_status: string;
 }
 
 interface Message {
@@ -112,6 +117,7 @@ interface ParsedResponse {
     dealType: 'cash' | 'creative_finance' | null;
     dead: boolean;
     tier: 1 | 2 | 3 | null;
+    goalMet: boolean;
   };
 }
 
@@ -121,6 +127,7 @@ function parseAIResponse(raw: string): ParsedResponse {
     dealType: null,
     dead: false,
     tier: null,
+    goalMet: false,
   };
 
   // Extract tags from the response
@@ -135,6 +142,7 @@ function parseAIResponse(raw: string): ParsedResponse {
   if (dealTypeCashMatch) actions.dealType = 'cash';
   if (dealTypeCreativeMatch) actions.dealType = 'creative_finance';
   if (tierMatch) actions.tier = parseInt(tierMatch[1], 10) as 1 | 2 | 3;
+  actions.goalMet = /\[GOAL_MET\]/i.test(raw);
 
   // Strip all tags from the message text sent to the contact
   const text = raw
@@ -142,13 +150,18 @@ function parseAIResponse(raw: string): ParsedResponse {
     .replace(/\[DEAL_TYPE:[^\]]+\]/gi, '')
     .replace(/\[DEAD\]/gi, '')
     .replace(/\[TIER:[^\]]+\]/gi, '')
+    .replace(/\[GOAL_MET\]/gi, '')
     .trim();
 
   return { text, actions };
 }
 
-function buildSystemPrompt(pipeline: string): string {
-  return pipeline === 'agent_outreach' ? AGENT_SYSTEM_PROMPT : SELLER_SYSTEM_PROMPT;
+function buildSystemPrompt(contact: Contact): string {
+  const base = contact.pipeline === 'agent_outreach' ? AGENT_SYSTEM_PROMPT : SELLER_SYSTEM_PROMPT;
+  const defaults = goalsForPipeline(contact.pipeline);
+  const immediate = contact.immediate_goal || defaults.immediateGoal;
+  const longTerm = contact.long_term_goal || defaults.longTermGoal;
+  return `${base}\n\n${buildGoalBlock(immediate, longTerm)}`;
 }
 
 async function loadHistory(conversationId: string): Promise<Message[]> {
@@ -243,6 +256,23 @@ async function applyActions(
   if (actions.humanTakeover) {
     await handleHumanTakeover(contact.id, inboundBody);
   }
+
+  // Goal met → notify owner + hand off
+  if (actions.goalMet && contact.goal_status !== 'met') {
+    const owner = (contact.goal_owner ?? goalsForPipeline(contact.pipeline).owner) as 'josh' | 'angel';
+    await pool.query(
+      `UPDATE contacts SET goal_status = 'met', human_takeover = TRUE, takeover_by = $1, ai_active = FALSE WHERE id = $2`,
+      [owner, contact.id]
+    );
+    const label = contact.name ?? contact.phone;
+    const goalText = contact.immediate_goal || goalsForPipeline(contact.pipeline).immediateGoal;
+    await dealRouting.sendNotification(
+      owner,
+      `Goal met for ${label} (${contact.phone}): ${goalText} — handed to you, take it from here.`
+    );
+    broadcast('contact:goal_met', { id: contact.id, owner });
+    broadcast('contact:takeover', { id: contact.id, agent: owner });
+  }
 }
 
 export async function handleInboundSMS(params: {
@@ -256,7 +286,8 @@ export async function handleInboundSMS(params: {
 
   // Load contact record
   const contactResult = await pool.query<Contact>(
-    `SELECT id, phone, name, pipeline, stage_id, human_takeover, ai_active, is_dnc, metadata
+    `SELECT id, phone, name, pipeline, stage_id, human_takeover, ai_active, is_dnc, metadata,
+            immediate_goal, long_term_goal, goal_owner, goal_status
      FROM contacts WHERE id = $1`,
     [contactId]
   );
@@ -282,7 +313,7 @@ export async function handleInboundSMS(params: {
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 300,
-    system: buildSystemPrompt(contact.pipeline),
+    system: buildSystemPrompt(contact),
     messages,
   });
 
