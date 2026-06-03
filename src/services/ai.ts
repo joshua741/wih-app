@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db/pool';
 import { broadcast } from '../websocket/server';
 import { goalsForPipeline, buildGoalBlock } from '../lib/goals';
+import { buildOpenerInstruction } from '../lib/outreachRules';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -87,7 +88,7 @@ HUMAN TAKEOVER — include [HUMAN_TAKEOVER] in response when:
 
 FORMAT: Only output the SMS text to send, plus any [TAG] instructions on a new line at the end. Tags are instructions only — never shown to the contact. Keep messages under 160 characters when possible.`;
 
-interface Contact {
+export interface Contact {
   id: string;
   phone: string;
   name: string | null;
@@ -369,6 +370,18 @@ export async function handleInboundSMS(params: {
 
   // Apply any action tags from AI response
   await applyActions(contact, conversationId, actions, body);
+}
+
+// Generate Vince's FIRST outreach text for a contact (goal-aware, opt-out included).
+export async function generateOpener(contact: Contact): Promise<string> {
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 200,
+    system: buildSystemPrompt(contact),
+    messages: [{ role: 'user', content: buildOpenerInstruction() }],
+  });
+  const raw = response.content[0].type === 'text' ? response.content[0].text : '';
+  return parseAIResponse(raw).text;
 }
 
 // Export a namespace for dealRouting to call back into (used by compliance.ts)
