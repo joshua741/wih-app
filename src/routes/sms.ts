@@ -4,6 +4,7 @@ import { pool } from '../db/pool';
 import { broadcast } from '../websocket/server';
 import { v4 as uuidv4 } from 'uuid';
 import { pipelineForNumber, contactTypeForPipeline, firstStageName } from '../lib/pipelineRouting';
+import { goalsForPipeline } from '../lib/goals';
 
 export const smsRouter = Router();
 
@@ -22,14 +23,15 @@ smsRouter.post('/', async (req: Request, res: Response) => {
     const pipeline = pipelineForNumber(To);
     const contactType = contactTypeForPipeline(pipeline);
     const stageName = firstStageName(pipeline);
+    const goals = goalsForPipeline(pipeline);
 
-    // 1. Upsert contact — pipeline/type/stage are chosen by which WIH number was texted.
+    // 1. Upsert contact — pipeline/type/stage/goals chosen by which WIH number was texted.
     const contactResult = await pool.query<{ id: string; is_dnc: boolean; human_takeover: boolean; ai_active: boolean }>(
-      `INSERT INTO contacts (id, phone, source, pipeline, contact_type, stage_id)
-       VALUES ($1, $2, $3, $3, $4, (SELECT id FROM pipeline_stages WHERE name = $5))
+      `INSERT INTO contacts (id, phone, source, pipeline, contact_type, stage_id, immediate_goal, long_term_goal, goal_owner)
+       VALUES ($1, $2, $3, $3, $4, (SELECT id FROM pipeline_stages WHERE name = $5), $6, $7, $8)
        ON CONFLICT (phone) DO UPDATE SET updated_at = NOW()
        RETURNING id, is_dnc, human_takeover, ai_active`,
-      [uuidv4(), From, pipeline, contactType, stageName]
+      [uuidv4(), From, pipeline, contactType, stageName, goals.immediateGoal, goals.longTermGoal, goals.owner]
     );
     const contact = contactResult.rows[0];
 
